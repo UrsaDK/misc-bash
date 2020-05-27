@@ -1,0 +1,377 @@
+#!/usr/bin/env bash
+
+INIT_DIR="$(pwd)"
+WORKING_DIR="$(dirname ${0})/.."
+
+__help() {
+cat <<EOS
+Build project resources
+
+    ${0##*/} [options] <target>
+
+    Options                 <> - required parameters
+    -------                 [] - optional parameters
+
+    -l --log=<path>         Redirect all output to a file
+    -q --quiet              Suppress output of the script
+    -v --version            Show project version number
+    -? --help               Display this help message
+
+    Targets                 <> - required parameters
+    -------                 [] - optional parameters
+
+    build                   $(help_build | head -1)
+    clean                   $(help_clean | head -1)
+    release                 $(help_release | head -1)
+    run                     $(help_run | head -1)
+    test                    $(help_test | head -1)
+    update                  $(help_update | head -1)
+    version                 Show project version number
+    help [target]           Display help for the target
+
+EOS
+}
+
+help_build() {
+cat <<EOS
+Build project and dependencies
+
+    -? --help               Display this help message
+
+Additional arguments can be passed on to the project build process with:
+
+    ${0##*/} ${FUNCNAME#help_} -- --version
+
+EOS
+}
+
+project_build() {
+    while getopts "?-:" OPTKEY; do
+        getopts_long OPTKEY
+        case ${OPTKEY} in
+            '?'|'help')
+                help_${TARGET}
+                exit
+                ;;
+            *)
+                if [ "$OPTERR" = 1 ] && [ "${optspec:0:1}" != ":" ]; then
+                    exit_error "${0}: illegal project option -- ${OPTKEY}"
+                fi
+                ;;
+        esac
+    done
+    shift $(( OPTIND - 1 ))
+    [[ "${1}" == "--" ]] && shift
+    echo "TODO: project build ${@}"
+}
+
+help_clean() {
+cat <<EOS
+Remove all build artefacts
+
+    -? --help               Display this help message
+
+Additional arguments can be passed on to the clean up process with:
+
+    ${0##*/} ${FUNCNAME#help_} -- --version
+
+EOS
+}
+
+project_clean() {
+    while getopts "?-:" OPTKEY; do
+        getopts_long OPTKEY
+        case ${OPTKEY} in
+            '?'|'help')
+                help_${TARGET}
+                exit
+                ;;
+            *)
+                if [ "$OPTERR" = 1 ] && [ "${optspec:0:1}" != ":" ]; then
+                    exit_error "${0}: illegal clean option -- ${OPTKEY}"
+                fi
+                ;;
+        esac
+    done
+    shift $(( OPTIND - 1 ))
+    [[ "${1}" == "--" ]] && shift
+    echo "TODO: project clean ${@}"
+}
+
+help_release() {
+cat <<EOS
+Tag and release current project
+
+Updated semantic version number for the project (stored in ./VERSION),
+and release current project to github, under a new tag.
+
+    -m --major              Introduced backwards-incompatible changes
+    -n --minor              Added a new backwards-compatible feature
+    -p --patch              Backwards-compatible bug fixes (default)
+    -? --help               Display this help message
+
+Arguments can be passed on to the git command using the following syntax:
+
+    ${0##*/} ${FUNCNAME#help_} -i -- --version
+
+EOS
+}
+
+update_VERSION() {
+    : ${1:?Missing release type}
+    local version_str=$(cat ./VERSION 2>&-)
+    local version_arr=( ${version_str//./ } )
+    local major=${version_arr[0]:-0}
+    local minor=${version_arr[1]:-0}
+    local patch=${version_arr[2]:-0}
+    declare ${1}=$(( ${!1} + 1 ))
+    echo "${major}.${minor}.${patch}" > ./VERSION
+    echo "Release version: $(cat ./VERSION)"
+}
+
+project_release() {
+    while getopts "mnp?-:" OPTKEY; do
+        getopts_long OPTKEY
+        case ${OPTKEY} in
+            'm'|'major')
+                RELEASE_TYPE='major'
+                ;;
+            'n'|'minor')
+                RELEASE_TYPE='minor'
+                ;;
+            'p'|'patch')
+                RELEASE_TYPE='patch'
+                ;;
+            '?'|'help')
+                help_${TARGET}
+                exit
+                ;;
+            *)
+                if [ "$OPTERR" = 1 ] && [ "${optspec:0:1}" != ":" ]; then
+                    exit_error "${0}: illegal release option -- ${OPTKEY}"
+                fi
+                ;;
+        esac
+    done
+    shift $(( OPTIND - 1 ))
+    [[ "${1}" == "--" ]] && shift
+    project_test || exit_error "${0}: release terminated due to failed tests"
+    update_VERSION ${RELEASE_TYPE:?Missing release type}
+    echo "TODO: project release ${@}"
+}
+
+help_run() {
+cat <<EOS
+Run current project
+
+    -? --help               Display this help message
+
+Arguments can be passed on to the project runner using
+the following syntax:
+
+    ${0##*/} ${FUNCNAME#help_} -- --version
+
+
+EOS
+}
+
+project_run() {
+    while getopts "?-:" OPTKEY; do
+        getopts_long OPTKEY
+        case ${OPTKEY} in
+            '?'|'help')
+                help_${TARGET}
+                exit
+                ;;
+            *)
+                if [ "$OPTERR" = 1 ] && [ "${optspec:0:1}" != ":" ]; then
+                    exit_error "${0}: illegal project option -- ${OPTKEY}"
+                fi
+                ;;
+        esac
+    done
+    shift $(( OPTIND - 1 ))
+    [[ "${1}" == "--" ]] && shift
+    echo "TODO: project run ${@}"
+}
+
+help_test() {
+cat <<EOS
+Run project tests
+
+    -c --code               Code-base BDD tests
+    -e --endpoint           Endpoint integration tests
+    -s --style              Code style tests
+    -? --help               Display this help message
+
+Arguments can be passed on to the individual test runners
+using the following syntax:
+
+    ${0##*/} ${FUNCNAME#help_} -i -- --version
+
+EOS
+}
+
+project_test() {
+    RUN_TESTS=()
+    while getopts "ces?-:" OPTKEY; do
+        getopts_long OPTKEY
+        case ${OPTKEY} in
+            'c'|'code')
+                RUN_TESTS+=('code')
+                ;;
+            'e'|'endpoint')
+                RUN_TESTS+=('endpoint')
+                ;;
+            's'|'style')
+                RUN_TESTS+=('style')
+                ;;
+            '?'|'help')
+                help_${TARGET}
+                exit
+                ;;
+            *)
+                if [ "$OPTERR" = 1 ] && [ "${optspec:0:1}" != ":" ]; then
+                    exit_error "${0}: illegal test option -- ${OPTKEY}"
+                fi
+                ;;
+        esac
+    done
+    shift $(( OPTIND - 1 ))
+    [[ "${1}" == "--" ]] && shift
+    for test_type in ${RUN_TESTS[@]:-code endpoint style}; do
+        case ${test_type} in
+            'code')
+                echo "TODO: run rspec tests ${@}"
+                ;;
+            'endpoint')
+                echo "TODO: run cucumber tests ${@}"
+                ;;
+            'style')
+                echo "TODO: run rubocop tests ${@}"
+                ;;
+            *)
+                exit_error "${0}: illegal test -- ${test_type}"
+                ;;
+        esac
+    done
+}
+
+help_update() {
+cat <<EOS
+Update project dependencies
+
+    -? --help               Display this help message
+
+Additional arguments can be passed on to the project pull command with:
+
+    ${0##*/} ${FUNCNAME#help_} -- --version
+
+EOS
+}
+
+project_update() {
+    UPDATE_DEPENDENCIES=()
+    while getopts "?-:" OPTKEY; do
+        getopts_long OPTKEY
+        case ${OPTKEY} in
+            'dependancy_a')
+                UPDATE_DEPENDENCIES+=('dependancy_a') # TODO
+                ;;
+            '?'|'help')
+                help_${TARGET}
+                exit
+                ;;
+            *)
+                if [ "$OPTERR" = 1 ] && [ "${optspec:0:1}" != ":" ]; then
+                    exit_error "${0}: illegal project option -- ${OPTKEY}"
+                fi
+                ;;
+        esac
+    done
+    shift $(( OPTIND - 1 ))
+    [[ "${1}" == "--" ]] && shift
+    for dependency in ${UPDATE_DEPENDENCIES[@]:-TODO}; do
+        case ${test_type} in
+            'dependancy_a')
+                echo "TODO: update dependancy_a"
+                ;;
+        esac
+    done
+    echo "TODO: project pull ${@}"
+}
+
+exit_error() {
+    echo ${1:?Missing error message} >&2
+    [[ -z "${TARGET}" ]] && __help || help_${TARGET}
+    exit ${2:-1}
+}
+
+getopts_long() {
+    : ${1:?Missing key container}
+    if [[ "${!1}" = '-' ]]; then
+        printf -v ${1} "${OPTARG%=*}"
+        OPTARG="${OPTARG#*=}"
+    fi
+}
+
+require_OPTARG() {
+    if [[ -z ${OPTARG} ]]; then
+        exit_error "${0}: option requires an argument -- ${OPTKEY}"
+    fi
+}
+
+trap "cd ${INIT_DIR}" EXIT
+cd "${WORKING_DIR}"
+
+while getopts "l:qv?-:" OPTKEY; do
+    getopts_long OPTKEY
+    case ${OPTKEY} in
+        'l'|'log')
+            require_OPTARG
+            mkdir -p $(dirname ${OPTARG})
+            exec 5>&1 6>&2 # Backup STDOUT and STDERR
+            exec > ${OPTARG} 2>&1
+            ;;
+        'q'|'quiet')
+            exec 5>&1 6>&2 # Backup STDOUT and STDERR
+            exec >&-
+            ;;
+        'v'|'version')
+            cat VERSION
+            exit
+            ;;
+        '?'|'help')
+            __help
+            exit
+            ;;
+        *)
+            if [ "$OPTERR" = 1 ] && [ "${optspec:0:1}" != ":" ]; then
+                exit_error "${0}: illegal option -- ${OPTKEY}"
+            fi
+            ;;
+    esac
+done
+
+shift $(( OPTIND - 1 ))
+[[ "${1}" == "--" ]] && shift
+
+[[ -z "${1}" ]] && exit_error "${0}: missing target"
+TARGET="${1}" && shift
+
+case ${TARGET} in
+    'build'|'clean'|'release'|'run'|'test'|'update')
+        project_${TARGET} ${@}
+        ;;
+    'version')
+        cat VERSION
+        exit
+        ;;
+    'help')
+        [[ -z "${1}" ]] && __help || help_${1}
+        exit
+        ;;
+    *)
+        exit_error "${0}: illegal target -- ${TARGET}"
+        ;;
+esac

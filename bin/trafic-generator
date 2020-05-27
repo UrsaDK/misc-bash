@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+:{CLIENT_CERT_PATH:?Missing path to the client PEM certificate}
+:{CLIENT_CERT_PASS:?Missing password for the client certificate}
+
+: ${ENDPOINT:="${1}"}
+: ${THREAD_COUNT:=3}
+
+random_string() {
+  local length=${1:-10}
+  local base=( $(echo {a..z} {A..Z} {0..9}) )
+  for index in $(seq 1 ${length}); do
+    index=$(( ${RANDOM} % ${#base[@]} ))
+    local string+=${base[$index]}
+  done
+  echo ${string}
+}
+
+call_api() {
+  local endpoint="${ENDPOINT}/?cache_buster=$(random_string)"
+  echo $(echo -n "$(date) - " && curl -si -E ${CLIENT_CERT_PATH/%.p12/.pem}:${CLIENT_CERT_PASS} "${endpoint}" | head -n 1)
+}
+
+trap 'kill $(jobs -p)' EXIT
+while true; do
+  active_jobs=$(jobs | wc -l | xargs)
+  : ${active_jobs:=0}
+  : ${max_jobs:=$(( ${THREAD_COUNT} - 1 ))}
+  if [[ ${active_jobs} < ${THREAD_COUNT} ]]; then
+    for job in $(seq ${active_jobs} ${max_jobs}); do
+      call_api &
+    done
+  fi
+  sleep 0.5
+done
